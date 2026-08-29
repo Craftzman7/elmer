@@ -43,8 +43,8 @@ func evtSubscribe(channel, query string) (*evtSubscription, error) {
 		return nil, err
 	}
 	h, _, err := procEvtSubscribe.Call(
-		0,                 // session (local)
-		0,                 // signal (pull mode)
+		0, // session (local)
+		0, // signal (pull mode)
 		uintptr(unsafe.Pointer(pch)),
 		uintptr(unsafe.Pointer(pq)),
 		0, 0, 0,
@@ -121,8 +121,8 @@ func renderEventXml(h syscall.Handle) (string, error) {
 type evtXml struct {
 	XMLName xml.Name `xml:"Event"`
 	System  struct {
-		EventID    int    `xml:"EventID"`
-		Computer   string `xml:"Computer"`
+		EventID     int    `xml:"EventID"`
+		Computer    string `xml:"Computer"`
 		TimeCreated struct {
 			SystemTime string `xml:"SystemTime,attr"`
 		} `xml:"TimeCreated"`

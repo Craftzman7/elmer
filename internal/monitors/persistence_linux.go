@@ -37,17 +37,17 @@ func (m *PersistenceMonitor) Capabilities() []string { return m.caps }
 // PersistenceSnapshot is the comparable state of a host's persistence
 // surface. Exported so `elmer audit` can render and write baselines.
 type PersistenceSnapshot struct {
-	Time        string            `json:"time"`
-	Users       map[string]string `json:"users"`        // name → uid:gid:shell
-	ShadowHashes map[string]string `json:"shadow"`      // user → password hash marker
-	UID0        []string          `json:"uid0"`         // accounts with uid 0
-	SudoRules   []string          `json:"sudo"`         // raw sudoers lines (normalized)
-	SUID        map[string]string `json:"suid"`         // path → sha256
-	Systemd     []string          `json:"systemd"`      // unit names
-	Cron        []string          `json:"cron"`         // cron file paths
-	Modules     []string          `json:"modules"`      // loaded kernel module names
-	SSHKeys     map[string]int    `json:"ssh_keys"`     // authorized_keys → line count
-	Preload     bool              `json:"ld_preload"`   // /etc/ld.so.preload exists
+	Time         string            `json:"time"`
+	Users        map[string]string `json:"users"`      // name → uid:gid:shell
+	ShadowHashes map[string]string `json:"shadow"`     // user → password hash marker
+	UID0         []string          `json:"uid0"`       // accounts with uid 0
+	SudoRules    []string          `json:"sudo"`       // raw sudoers lines (normalized)
+	SUID         map[string]string `json:"suid"`       // path → sha256
+	Systemd      []string          `json:"systemd"`    // unit names
+	Cron         []string          `json:"cron"`       // cron file paths
+	Modules      []string          `json:"modules"`    // loaded kernel module names
+	SSHKeys      map[string]int    `json:"ssh_keys"`   // authorized_keys → line count
+	Preload      bool              `json:"ld_preload"` // /etc/ld.so.preload exists
 }
 
 func (m *PersistenceMonitor) Start(ctx context.Context, out chan<- events.Event) error {

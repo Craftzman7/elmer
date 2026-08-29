@@ -79,14 +79,14 @@ const (
 // Event is a single observation from a monitor or a finding from the
 // detection engine.
 type Event struct {
-	Time      time.Time          `json:"time"`
-	Severity  Severity           `json:"severity"`
-	Category  string             `json:"category"`
-	Title     string             `json:"title"`
-	Message   string             `json:"message"`
-	Fields    map[string]string  `json:"fields,omitempty"`
-	Technique string             `json:"technique,omitempty"`
-	Host      string             `json:"host,omitempty"`
+	Time      time.Time         `json:"time"`
+	Severity  Severity          `json:"severity"`
+	Category  string            `json:"category"`
+	Title     string            `json:"title"`
+	Message   string            `json:"message"`
+	Fields    map[string]string `json:"fields,omitempty"`
+	Technique string            `json:"technique,omitempty"`
+	Host      string            `json:"host,omitempty"`
 	// Key is the dedupe identity. If empty, dedupe uses Title+Category.
 	Key string `json:"-"`
 }

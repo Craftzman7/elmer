@@ -37,12 +37,12 @@ func (m *PersistenceMonitor) Name() string { return "persistence" }
 func (m *PersistenceMonitor) Capabilities() []string { return m.caps }
 
 type PersistenceSnapshot struct {
-	Time       string            `json:"time"`
-	Startup    map[string]string `json:"startup"`   // file → size
-	RunKeys    map[string]string `json:"runkeys"`   // key → command
-	Services   map[string]string `json:"services"`  // name → image path
-	Tasks      []string          `json:"tasks"`     // task names
-	Admins     []string          `json:"admins"`    // local administrators
+	Time     string            `json:"time"`
+	Startup  map[string]string `json:"startup"`  // file → size
+	RunKeys  map[string]string `json:"runkeys"`  // key → command
+	Services map[string]string `json:"services"` // name → image path
+	Tasks    []string          `json:"tasks"`    // task names
+	Admins   []string          `json:"admins"`   // local administrators
 }
 
 func (m *PersistenceMonitor) Start(ctx context.Context, out chan<- events.Event) error {

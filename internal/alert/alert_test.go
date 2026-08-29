@@ -136,9 +136,9 @@ func TestManagerFiltering(t *testing.T) {
 	defer cancel()
 	go m.Run(ctx)
 
-	m.Dispatch(testEvent(events.Info))  // filtered out
+	m.Dispatch(testEvent(events.Info))   // filtered out
 	m.Dispatch(testEvent(events.Medium)) // filtered out
-	m.Dispatch(testEvent(events.High))  // delivered
+	m.Dispatch(testEvent(events.High))   // delivered
 	time.Sleep(300 * time.Millisecond)
 
 	mu.Lock()

@@ -117,14 +117,14 @@ func equalFold(a, b string) bool {
 func TestFileRules(t *testing.T) {
 	e, _ := NewEngine(testConfig())
 	for path, wantSev := range map[string]events.Severity{
-		"/etc/shadow":                    events.Critical,
-		"/root/.ssh/authorized_keys":     events.Critical,
-		"/etc/ld.so.preload":             events.Critical,
-		"/etc/cron.d/persistence":        events.High,
-		"/usr/bin/sshd":                  events.High,
-		"/tmp/chisel":                    events.High, // known bad filename
-		"/opt/tools/linpeas.sh":          events.High,
-		"/home/user/notes.txt":           events.Info,
+		"/etc/shadow":                events.Critical,
+		"/root/.ssh/authorized_keys": events.Critical,
+		"/etc/ld.so.preload":         events.Critical,
+		"/etc/cron.d/persistence":    events.High,
+		"/usr/bin/sshd":              events.High,
+		"/tmp/chisel":                events.High, // known bad filename
+		"/opt/tools/linpeas.sh":      events.High,
+		"/home/user/notes.txt":       events.Info,
 	} {
 		ev := events.Event{
 			Time: time.Now(), Severity: events.Info, Category: events.CatFile,
@@ -146,7 +146,7 @@ func TestBruteForceThreshold(t *testing.T) {
 	var fired []events.Event
 	for i := 0; i < 25; i++ {
 		ev := events.Event{
-			Time: start.Add(time.Duration(i) * time.Second),
+			Time:     start.Add(time.Duration(i) * time.Second),
 			Severity: events.Info, Category: events.CatAuth,
 			Title: "SSH auth failure", Message: "Failed password for root from 203.0.113.9",
 			Fields: map[string]string{"auth": "fail", "src_ip": "203.0.113.9", "user": "root"},

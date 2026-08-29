@@ -42,9 +42,9 @@ type connKey struct {
 }
 
 type conn struct {
-	key  connKey
+	key   connKey
 	inode string
-	uid  string
+	uid   string
 }
 
 func (m *NetMonitor) Start(ctx context.Context, out chan<- events.Event) error {

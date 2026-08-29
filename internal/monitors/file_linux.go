@@ -160,10 +160,8 @@ func (m *FileMonitor) watchDir(fd int, dir string, names []string) int {
 		set = map[string]bool{}
 		m.targets[dir] = set
 	}
-	if names != nil {
-		for _, n := range names {
-			set[n] = true
-		}
+	for _, n := range names {
+		set[n] = true
 	}
 	m.mu.Unlock()
 	return 1

@@ -19,12 +19,11 @@ import (
 // Discord posts alerts as webhook embeds, batching bursts within a short
 // window into one message. Rate limits (429) are honored via Retry-After.
 type Discord struct {
-	cfg   config.DiscordConfig
+	cfg    config.DiscordConfig
 	client *http.Client
 
 	mu      sync.Mutex
 	pending []events.Event
-	flushed bool
 }
 
 func NewDiscord(cfg config.DiscordConfig) *Discord {
@@ -78,8 +77,8 @@ func (d *Discord) flush() {
 }
 
 type discordMsg struct {
-	Username string          `json:"username,omitempty"`
-	Embeds   []discordEmbed  `json:"embeds"`
+	Username string         `json:"username,omitempty"`
+	Embeds   []discordEmbed `json:"embeds"`
 }
 
 type discordEmbed struct {

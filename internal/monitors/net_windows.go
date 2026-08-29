@@ -43,19 +43,19 @@ const (
 	afInet              = 2
 	afInet6             = 23
 
-	mibTcpStateListen     = 2
+	mibTcpStateListen      = 2
 	mibTcpStateEstablished = 5
 )
 
 type tcpRow struct {
-	State          uint32
-	LocalAddr      uint32
-	LocalScopeID   uint32
-	LocalPort      uint32
-	RemoteAddr     uint32
-	RemoteScopeID  uint32
-	RemotePort     uint32
-	OwningPid      uint32
+	State         uint32
+	LocalAddr     uint32
+	LocalScopeID  uint32
+	LocalPort     uint32
+	RemoteAddr    uint32
+	RemoteScopeID uint32
+	RemotePort    uint32
+	OwningPid     uint32
 }
 
 type udpRow struct {
@@ -186,8 +186,8 @@ func snapshotWin() map[connKey]uint32 {
 		if rows, err := udpTable(af); err == nil {
 			for _, r := range rows {
 				k := connKey{
-					local:  fmt.Sprintf("%s:%d", ipStr(r.LocalAddr, af), portHtons(r.LocalPort)),
-					state:  "UDP",
+					local: fmt.Sprintf("%s:%d", ipStr(r.LocalAddr, af), portHtons(r.LocalPort)),
+					state: "UDP",
 				}
 				out[k] = r.OwningPid
 			}

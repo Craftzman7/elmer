@@ -251,11 +251,11 @@ func (e *Engine) correlateAuth(ev *events.Event) []events.Event {
 		Severity: lv.Severity,
 		Category: events.CatAuth,
 		Title:    lv.Title,
-		Message:  fmt.Sprintf("%d failed logins from %s within %s (last user: %s)",
+		Message: fmt.Sprintf("%d failed logins from %s within %s (last user: %s)",
 			lv.Count, ev.Field("src_ip"), e.cfg.BruteForceWindow, ev.Field("user")),
-		Fields:   map[string]string{"src_ip": ev.Field("src_ip")},
+		Fields:    map[string]string{"src_ip": ev.Field("src_ip")},
 		Technique: "T1110",
-		Key:      "bruteforce/" + ev.Field("src_ip"),
+		Key:       "bruteforce/" + ev.Field("src_ip"),
 	}}
 }
 

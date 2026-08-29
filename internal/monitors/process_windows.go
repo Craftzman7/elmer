@@ -90,16 +90,16 @@ var (
 const th32csSnapProcess = 0x2
 
 type processEntry32 struct {
-	Size              uint32
-	CntUsage          uint32
-	ProcessID         uint32
-	DefaultHeapID     uintptr
-	ModuleID          uint32
-	CntThreads        uint32
-	ParentProcessID   uint32
-	PriClassBase      int32
-	Flags             uint32
-	ExeFile           [windows.MAX_PATH]uint16
+	Size            uint32
+	CntUsage        uint32
+	ProcessID       uint32
+	DefaultHeapID   uintptr
+	ModuleID        uint32
+	CntThreads      uint32
+	ParentProcessID uint32
+	PriClassBase    int32
+	Flags           uint32
+	ExeFile         [windows.MAX_PATH]uint16
 }
 
 func (m *ProcessMonitor) runToolhelp(ctx context.Context, out chan<- events.Event) error {

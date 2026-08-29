@@ -36,13 +36,13 @@ func (m *FileMonitor) Name() string { return "fim" }
 func (m *FileMonitor) Capabilities() []string { return m.caps }
 
 const (
-	fileListDirectory   = 0x0001
-	fileFlagBackupSem   = 0x02000000
-	notifyChangeName    = 0x00000001 | 0x00000002 | 0x00000004 // add/remove/rename
-	notifyChangeAttrs   = 0x00000010                            // attributes
-	notifyChangeLastWr  = 0x00000020                            // write
-	notifyChangeSize    = 0x00000040
-	notifyAll           = notifyChangeName | notifyChangeAttrs | notifyChangeLastWr | notifyChangeSize
+	fileListDirectory  = 0x0001
+	fileFlagBackupSem  = 0x02000000
+	notifyChangeName   = 0x00000001 | 0x00000002 | 0x00000004 // add/remove/rename
+	notifyChangeAttrs  = 0x00000010                           // attributes
+	notifyChangeLastWr = 0x00000020                           // write
+	notifyChangeSize   = 0x00000040
+	notifyAll          = notifyChangeName | notifyChangeAttrs | notifyChangeLastWr | notifyChangeSize
 )
 
 func (m *FileMonitor) Start(ctx context.Context, out chan<- events.Event) error {
@@ -151,7 +151,7 @@ func (m *FileMonitor) consume(b []byte, dir string, out chan<- events.Event) {
 		if off+12+int(nameLen) > len(b) {
 			return
 		}
-		name := windows.UTF16ToString((*[4096]uint16)(unsafe.Pointer(&b[off+12]))[: nameLen/2])
+		name := windows.UTF16ToString((*[4096]uint16)(unsafe.Pointer(&b[off+12]))[:nameLen/2])
 		if next == 0 {
 			off = len(b)
 		} else {
@@ -191,8 +191,8 @@ func (m *FileMonitor) consume(b []byte, dir string, out chan<- events.Event) {
 // ---- registry Run keys -------------------------------------------------------
 
 var runKeyPaths = []struct {
-	root                             registry.Key
-	path                             string
+	root registry.Key
+	path string
 }{
 	{registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`},
 	{registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\RunOnce`},
@@ -250,14 +250,14 @@ func readRunKeys() map[string]string {
 
 func runKeyEvent(sev events.Severity, title, key, value string) events.Event {
 	ev := events.Event{
-		Time:     time.Now(),
-		Severity: sev,
-		Category: events.CatPersistence,
-		Title:    title,
-		Message:  key + " = " + value,
-		Host:     events.Host,
+		Time:      time.Now(),
+		Severity:  sev,
+		Category:  events.CatPersistence,
+		Title:     title,
+		Message:   key + " = " + value,
+		Host:      events.Host,
 		Technique: "T1547.001",
-		Key:      "runkey/" + key,
+		Key:       "runkey/" + key,
 	}
 	return ev
 }

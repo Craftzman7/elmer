@@ -50,8 +50,8 @@ func (m *ProcessMonitor) Start(ctx context.Context, out chan<- events.Event) err
 	} else {
 		m.caps = append(m.caps, "netlink unavailable ("+err.Error()+"); polling /proc at "+
 			m.cfg.PollInterval.String())
-		out <- DegradedNote("process events degraded: netlink proc connector unavailable, "+
-			"falling back to /proc polling at "+m.cfg.PollInterval.String())
+		out <- DegradedNote("process events degraded: netlink proc connector unavailable, " +
+			"falling back to /proc polling at " + m.cfg.PollInterval.String())
 	}
 	return m.runPolling(ctx, out)
 }
@@ -107,17 +107,17 @@ func (m *ProcessMonitor) runNetlink(ctx context.Context, out chan<- events.Event
 func subscribeProcConnector(fd int) error {
 	// nlmsghdr(16) | cn_msg hdr(24: id.idx, id.val, seq, ack, len, flags, pad) | mcast_op(4)
 	b := make([]byte, 16+24+4)
-	binary.LittleEndian.PutUint32(b[0:], uint32(len(b)))  // nlmsg_len
-	binary.LittleEndian.PutUint16(b[4:], 2)               // nlmsg_type = NLMSG_DONE? (unused by kernel)
-	binary.LittleEndian.PutUint16(b[6:], 0)               // flags
-	binary.LittleEndian.PutUint32(b[8:], 0)               // seq
-	binary.LittleEndian.PutUint32(b[12:], 0)              // pid
+	binary.LittleEndian.PutUint32(b[0:], uint32(len(b))) // nlmsg_len
+	binary.LittleEndian.PutUint16(b[4:], 2)              // nlmsg_type = NLMSG_DONE? (unused by kernel)
+	binary.LittleEndian.PutUint16(b[6:], 0)              // flags
+	binary.LittleEndian.PutUint32(b[8:], 0)              // seq
+	binary.LittleEndian.PutUint32(b[12:], 0)             // pid
 	off := 16
-	binary.LittleEndian.PutUint32(b[off+0:], cnIdxProc)   // cn_msg.id.idx
-	binary.LittleEndian.PutUint32(b[off+4:], cnValProc)   // cn_msg.id.val
-	binary.LittleEndian.PutUint32(b[off+8:], 0)           // seq
-	binary.LittleEndian.PutUint32(b[off+12:], 0)          // ack
-	binary.LittleEndian.PutUint32(b[off+16:], 4)          // len
+	binary.LittleEndian.PutUint32(b[off+0:], cnIdxProc) // cn_msg.id.idx
+	binary.LittleEndian.PutUint32(b[off+4:], cnValProc) // cn_msg.id.val
+	binary.LittleEndian.PutUint32(b[off+8:], 0)         // seq
+	binary.LittleEndian.PutUint32(b[off+12:], 0)        // ack
+	binary.LittleEndian.PutUint32(b[off+16:], 4)        // len
 	// flags(1) + 3 pad
 	binary.LittleEndian.PutUint32(b[off+20:], procCnMcastListen)
 	return unix.Sendmsg(fd, b, nil, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}, 0)
@@ -151,10 +151,10 @@ func (m *ProcessMonitor) parseNetlink(b []byte, out chan<- events.Event) {
 				Title:    "setuid escalation to root",
 				Message: fmt.Sprintf("pid %d raised euid from %d to 0",
 					pid, ruid),
-				Fields:   map[string]string{"pid": strconv.Itoa(pid), "uid": "0"},
+				Fields:    map[string]string{"pid": strconv.Itoa(pid), "uid": "0"},
 				Technique: "T1548.001",
-				Host:     events.Host,
-				Key:      "setuid/" + strconv.Itoa(pid),
+				Host:      events.Host,
+				Key:       "setuid/" + strconv.Itoa(pid),
 			}
 		}
 	}
