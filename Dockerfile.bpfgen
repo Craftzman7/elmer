@@ -1,0 +1,6 @@
+# Build image for regenerating elmer's embedded BPF objects.
+# Apple clang lacks the BPF target, so generation runs in Linux.
+FROM golang:1.27
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends clang llvm \
+    && rm -rf /var/lib/apt/lists/*
