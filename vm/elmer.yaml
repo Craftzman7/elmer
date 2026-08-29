@@ -1,0 +1,52 @@
+# elmer configuration for the vm/ test target. provision.sh installs it as
+# /etc/elmer/elmer.yaml. Alert channels stay empty on purpose: stdout goes
+# to journald, which is the demo channel —
+#   vagrant ssh -c 'sudo journalctl -u elmer -f'
+# Drop an ntfy/discord/webhook block in here to watch those fire instead.
+
+poll_interval: 250ms
+sweep_interval: 5m
+state_dir: /var/lib/elmer
+
+# The VirtualBox host-only net (192.168.56.0/24) counts as internal, so
+# logins from the attacker (the host, 192.168.56.1) are not themselves
+# flagged as external.
+internal_cidrs:
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 192.168.0.0/16
+  - 127.0.0.0/8
+
+dedupe_cooldown: 60s
+heartbeat: 1m
+log_all_process_events: true
+
+monitors:
+  ebpf: true
+  process: true
+  auth: true
+  fim: true
+  net: true
+  persistence: true
+
+fim:
+  extra_paths:
+    - /var/www/ # web shells and defacement land here
+
+# Demo of the user-rules mechanism: in a competition, anything touching a
+# flag file is worth an immediate critical page.
+rules:
+  - id: flag-access
+    category: process
+    target: process
+    pattern: '(?i)flag\.txt'
+    severity: critical
+    title: Flag file accessed
+    technique: T1005
+
+# Ports the attack demos listen on, on top of the built-in defaults.
+suspicious_listen_ports: [4444, 4445, 5555, 8000, 8081, 9050, 31337]
+
+brute_force_window: 2m
+brute_force_count: 5
+brute_force_high_count: 20

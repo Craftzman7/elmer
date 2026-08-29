@@ -1,0 +1,47 @@
+# elmer test target — a deliberately vulnerable Ubuntu box running elmer as
+# a root systemd service, exercised by the attack chain in attacks/.
+#
+# Apple Silicon (VirtualBox 7.1+ ARM): the only maintained arm64
+# VirtualBox boxes are Ubuntu 24.04 (cloudicio/ubuntu-server). Intel hosts
+# and competition boxes use bento/ubuntu-22.04 (jammy); provision.sh
+# handles both. The binary and config are pushed over SSH by the file
+# provisioner, so the box needs no guest additions or synced folders.
+require "etc"
+
+arm_host = Etc.uname[:version].include?("ARM64") ||
+           RUBY_PLATFORM.include?("aarch64") ||
+           RUBY_PLATFORM.include?("arm64")
+
+dist = File.expand_path("../dist", __dir__)
+bin = File.join(dist, arm_host ? "elmer-linux-arm64" : "elmer-linux-amd64")
+
+Vagrant.configure("2") do |config|
+  if arm_host
+    config.vm.box = "cloudicio/ubuntu-server"
+    config.vm.box_version = "24.04.1"
+  else
+    config.vm.box = "bento/ubuntu-22.04"
+  end
+  config.vm.hostname = "web01"
+
+  # Nothing is shared via vboxsf; everything the guest needs arrives over
+  # SSH. This keeps the box provider-portable (virtualbox, qemu, libvirt).
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  # Static host-only address; the host side of the adapter is 192.168.56.1,
+  # which is where the attack scripts expect the attacker to live.
+  config.vm.network "private_network", ip: "192.168.56.10"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "elmer-target"
+    vb.memory = 2048
+    vb.cpus = 2
+  end
+
+  if File.exist?(bin)
+    config.vm.provision "file", source: bin, destination: "/tmp/elmer"
+  end
+  config.vm.provision "file", source: File.expand_path("elmer.yaml", __dir__),
+                               destination: "/tmp/elmer.yaml"
+  config.vm.provision "shell", path: "provision.sh"
+end
