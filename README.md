@@ -96,6 +96,12 @@ cilium/ebpf (loader only — BPF bytecode is precompiled and embedded).
 
 ## Notes for competition use
 
+- Start from `elmer.example.yaml` — a commented, competition-ready config
+  (internal CIDRs, flag rule, suspicious ports, relayed alerting).
+- Competition boxes are usually air-gapped. Route Discord alerts through
+  `tools/discord_relay.py` running on a blue team box that has internet:
+  elmer's webhook channel POSTs to it over the LAN (HMAC-signed), and it
+  forwards to Discord while logging every alert locally.
 - Run `elmer audit --write-baseline` at gold-image/clean time so sweeps
   alert on deltas, not stock state.
 - Set `internal_cidrs` to the competition ranges — external connections

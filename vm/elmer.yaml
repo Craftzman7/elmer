@@ -1,8 +1,10 @@
 # elmer configuration for the vm/ test target. provision.sh installs it as
-# /etc/elmer/elmer.yaml. Alert channels stay empty on purpose: stdout goes
-# to journald, which is the demo channel —
-#   vagrant ssh -c 'sudo journalctl -u elmer -f'
-# Drop an ntfy/discord/webhook block in here to watch those fire instead.
+# /etc/elmer/elmer.yaml.
+#
+# Webhook alerts relay through the host (192.168.56.1, the air-gapped
+# "blue team laptop"): elmer POSTs over plain HTTP to tools/discord_relay.py
+# running there, which verifies the HMAC and forwards to Discord.
+#   python3 tools/discord_relay.py --discord <url> --secret <secret>
 
 poll_interval: 250ms
 sweep_interval: 5m
@@ -50,3 +52,15 @@ suspicious_listen_ports: [4444, 4445, 5555, 8000, 8081, 9050, 31337]
 brute_force_window: 2m
 brute_force_count: 5
 brute_force_high_count: 20
+
+alerts:
+  webhook:
+    url: http://192.168.56.1:8080/alert
+    # Demo placeholder — swap in a real secret (python3 -c
+    # 'import secrets; print(secrets.token_urlsafe(18))') and pass the
+    # same value to the relay's --secret.
+    secret: elmer-demo-secret
+    # Keep this at medium or higher: with log_all_process_events on, an
+    # info-level webhook is a firehose, and elmer's own outbound connects
+    # to the relay would feed back into more alerts.
+    min_severity: medium

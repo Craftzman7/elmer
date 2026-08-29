@@ -110,9 +110,24 @@ vagrant ssh -c 'sudo elmer test-alerts'
 vagrant ssh -c 'sudo journalctl -u elmer -o cat -f | ...'
 ```
 
-Alert channels are intentionally empty in `vm/elmer.yaml` (stdout to
-journald is the demo channel). Add an `alerts.ntfy` block and re-provision
-to watch phone notifications arrive instead.
+Alert channels: `elmer.yaml` ships a webhook block pointing at
+`http://192.168.56.1:8080/alert` — the host end of the VirtualBox
+network, standing in for the air-gapped blue-team laptop. Run the relay
+on the host to forward alerts to Discord:
+
+```sh
+python3 tools/discord_relay.py --discord <webhook-url> --secret <secret>
+```
+
+(Generate a secret with
+`python3 -c 'import secrets; print(secrets.token_urlsafe(18))'` and use it
+for both the relay's `--secret` and `alerts.webhook.secret` — the value
+committed in `elmer.yaml` is a placeholder. Without the relay running,
+alerts back up and are dropped — stdout to journald remains the channel
+of record: `vagrant ssh -c 'sudo journalctl -u elmer -f'`.)
+Keep the webhook `min_severity` at `medium` or higher here: this box
+logs all process events, and an `info` webhook both floods and feeds
+back on itself — elmer's net monitor sees elmer's own POSTs to the relay.
 
 ## Resetting
 

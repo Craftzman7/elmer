@@ -1,0 +1,103 @@
+# elmer — example competition configuration
+#
+# A realistic starting point for a Red v Blue box: every monitor on,
+# alerts relayed off the air-gapped competition network through a blue
+# team box that has internet, and a flag-file rule worth paging for.
+#
+# Competition boxes usually have no internet. Direct Discord/ntfy.sh
+# delivery won't work there — run tools/discord_relay.py on the blue
+# team laptop instead and point the webhook at it over the LAN:
+#
+#   # generate a shared secret once, use it here and at the relay:
+#   python3 -c 'import secrets; print(secrets.token_urlsafe(18))'
+#   python3 tools/discord_relay.py \
+#       --discord https://discord.com/api/webhooks/... \
+#       --secret <that secret> --listen 0.0.0.0:8080
+#
+# Copy this file to elmer.yaml and edit the TODO lines; everything
+# commented out matches the built-in defaults.
+
+poll_interval: 250ms
+# Persistence sweep (users, SUID, systemd, cron, kernel modules).
+sweep_interval: 5m
+state_dir: /var/lib/elmer
+
+# TODO: the competition ranges. Connections anywhere else are flagged
+# external — the single highest-value setting in this file.
+internal_cidrs:
+  - 10.10.0.0/16     # TODO competition network
+  - 127.0.0.0/8
+
+# Short heartbeat so a dead elmer shows up as channel silence fast.
+heartbeat: 1m
+dedupe_cooldown: 60s
+
+# Streams every exec at INFO to stdout only — alert channels are gated
+# by their own min_severity, so leave this on for journald forensics.
+log_all_process_events: true
+
+monitors:
+  ebpf: true          # linux only; falls back to netlink/proc loudly
+  process: true
+  auth: true
+  fim: true
+  net: true
+  persistence: true
+
+fim:
+  # On top of the default watch set (passwd/shadow/sudoers, sshd_config,
+  # authorized_keys, cron, systemd, binary dirs, /tmp, /dev/shm, ...).
+  # TODO: web-served boxes — add the document root; flag boxes — add
+  # the flag directory (FIM on a flag catches reads-as-writes only, so
+  # also add the flag rule below for process access).
+  extra_paths:
+    - /var/www/
+
+# Anything touching a flag file pages the whole team.
+# TODO: match where this competition hides its flags.
+rules:
+  - id: flag-access
+    category: process
+    target: process
+    pattern: '(?i)flag\.txt|/flags?/'
+    severity: critical
+    title: Flag file accessed
+    technique: T1005
+
+# Disable built-in rules by id (see internal/detect/rules.go).
+#disabled_rules: [recon-nmap]
+
+# Replaces the built-in list — this is the default set plus common
+# implant/C2 ports seen in competitions.
+suspicious_listen_ports:
+  [4444, 4445, 5555, 8000, 8081, 9001, 9002, 9050, 1080, 1337, 31337]
+
+# Defaults cover chisel/frp/socat/mimikatz/winpeas/etc; only set this to
+# replace the whole list (see internal/config/defaults.go).
+#known_bad_filenames: []
+
+brute_force_window: 2m
+brute_force_count: 5
+brute_force_high_count: 20
+
+alerts:
+  # The relay on the blue team laptop. Plain HTTP is fine on the
+  # competition LAN; the HMAC secret stops other teams injecting fake
+  # alerts. Keep min_severity at medium+ — info floods the channel and
+  # feeds back on itself (elmer sees its own POSTs to the relay).
+  webhook:
+    url: http://10.10.5.5:8080/alert   # TODO blue team laptop IP
+    secret: "TODO-generate-and-share"  # TODO must match the relay's --secret
+    min_severity: medium
+
+  # Alternative: self-hosted ntfy on the blue team LAN (run `ntfy serve`
+  # there). Phone push without any internet dependency.
+  #ntfy:
+  #  url: http://10.10.5.5/            # self-hosted, NOT ntfy.sh
+  #  topic: elmer-box01                 # unique per monitored box
+  #  min_severity: high
+
+  # Only usable if the box itself has internet — most don't.
+  #discord:
+  #  url: https://discord.com/api/webhooks/...
+  #  min_severity: high
