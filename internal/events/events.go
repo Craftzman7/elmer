@@ -113,7 +113,8 @@ func (e *Event) Summary() string {
 	fmt.Fprintf(&b, "%s %-8s %-11s %s", e.Time.Format("15:04:05"),
 		e.Severity, e.Category, e.Title)
 	if e.Message != "" {
-		b.WriteString(": " + e.Message)
+		b.WriteString(": ")
+		b.WriteString(e.Message)
 	}
 	return b.String()
 }
