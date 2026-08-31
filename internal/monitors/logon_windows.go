@@ -10,6 +10,23 @@ import (
 	"elmer/internal/events"
 )
 
+const (
+	LogonSuccess            = 4624
+	LogonFail               = 4625
+	Logoff                  = 4647
+	UserCreated             = 4720
+	UserEnabled             = 4722
+	PasswordReset           = 4724
+	AddedToGroupAD          = 4728
+	AddedToGroupLocal       = 4732
+	GroupChanged            = 4735
+	ServiceInstalled        = 4697
+	TaskCreated             = 4698
+	TaskUpdated             = 4702
+	SystemServiceInstalled  = 7045
+	ServiceStartTypeChanged = 7040
+)
+
 // AuthMonitor consumes logon, account, service, and scheduled-task events
 // from the Security and System channels.
 type AuthMonitor struct {
@@ -65,7 +82,7 @@ func (m *AuthMonitor) parse(now time.Time, doc string) (events.Event, bool) {
 		return events.Event{}, false
 	}
 	switch id {
-	case 4624: // successful logon
+	case LogonSuccess: // successful logon
 		sev := events.Info
 		switch data["LogonType"] {
 		case "10": // RDP
@@ -81,7 +98,7 @@ func (m *AuthMonitor) parse(now time.Time, doc string) (events.Event, bool) {
 			ev.With("src_ip", ip)
 		}
 		return ev, true
-	case 4625: // failed logon
+	case LogonFail: // failed logon
 		ev := evtEvent(events.CatAuth, "logon failure", events.Medium, data)
 		ev.Time = now
 		ev.With("auth", "fail")
@@ -89,31 +106,31 @@ func (m *AuthMonitor) parse(now time.Time, doc string) (events.Event, bool) {
 			ev.With("src_ip", ip)
 		}
 		return ev, true
-	case 4647: // logoff
+	case Logoff: // logoff
 		ev := evtEvent(events.CatAuth, "logoff", events.Info, data)
 		ev.Time = now
 		return ev, true
-	case 4720: // user created
+	case UserCreated: // user created
 		ev := evtEvent(events.CatAuth, "user account created", events.Critical, data)
 		ev.Time = now
 		ev.Key = "winuser/" + data["TargetUserName"]
 		return ev, true
-	case 4722: // user enabled
+	case UserEnabled: // user enabled
 		ev := evtEvent(events.CatAuth, "user account enabled", events.High, data)
 		ev.Time = now
 		return ev, true
-	case 4724: // password reset
+	case PasswordReset: // password reset
 		ev := evtEvent(events.CatAuth, "password reset", events.High, data)
 		ev.Time = now
 		return ev, true
-	case 4728, 4732: // added to group
+	case AddedToGroupAD, AddedToGroupLocal:
 		ev := evtEvent(events.CatAuth, "user added to group", events.High, data)
 		ev.Time = now
 		if data["TargetUserName"] == "Administrators" {
 			ev.Severity = events.Critical
 		}
 		return ev, true
-	case 4735: // group changed
+	case GroupChanged: // group changed
 		ev := evtEvent(events.CatAuth, "group changed", events.Medium, data)
 		ev.Time = now
 		return ev, true
