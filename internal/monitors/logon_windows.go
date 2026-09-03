@@ -25,6 +25,10 @@ const (
 	TaskUpdated             = 4702
 	SystemServiceInstalled  = 7045
 	ServiceStartTypeChanged = 7040
+
+	RDPLogon         = "10"
+	NetworkLogon     = "3"
+	InteractiveLogon = "2"
 )
 
 // AuthMonitor consumes logon, account, service, and scheduled-task events
@@ -82,14 +86,14 @@ func (m *AuthMonitor) parse(now time.Time, doc string) (events.Event, bool) {
 		return events.Event{}, false
 	}
 	switch id {
-	case LogonSuccess: // successful logon
+	case LogonSuccess:
 		sev := events.Info
 		switch data["LogonType"] {
-		case "10": // RDP
+		case RDPLogon:
 			sev = events.Low
-		case "3": // network
+		case NetworkLogon: // network
 			sev = events.Low
-		case "2": // interactive
+		case InteractiveLogon: // interactive
 		}
 		ev := evtEvent(events.CatAuth, "logon", sev, data)
 		ev.Time = now
@@ -98,7 +102,7 @@ func (m *AuthMonitor) parse(now time.Time, doc string) (events.Event, bool) {
 			ev.With("src_ip", ip)
 		}
 		return ev, true
-	case LogonFail: // failed logon
+	case LogonFail:
 		ev := evtEvent(events.CatAuth, "logon failure", events.Medium, data)
 		ev.Time = now
 		ev.With("auth", "fail")
@@ -106,20 +110,20 @@ func (m *AuthMonitor) parse(now time.Time, doc string) (events.Event, bool) {
 			ev.With("src_ip", ip)
 		}
 		return ev, true
-	case Logoff: // logoff
+	case Logoff:
 		ev := evtEvent(events.CatAuth, "logoff", events.Info, data)
 		ev.Time = now
 		return ev, true
-	case UserCreated: // user created
+	case UserCreated:
 		ev := evtEvent(events.CatAuth, "user account created", events.Critical, data)
 		ev.Time = now
 		ev.Key = "winuser/" + data["TargetUserName"]
 		return ev, true
-	case UserEnabled: // user enabled
+	case UserEnabled:
 		ev := evtEvent(events.CatAuth, "user account enabled", events.High, data)
 		ev.Time = now
 		return ev, true
-	case PasswordReset: // password reset
+	case PasswordReset:
 		ev := evtEvent(events.CatAuth, "password reset", events.High, data)
 		ev.Time = now
 		return ev, true
@@ -130,30 +134,30 @@ func (m *AuthMonitor) parse(now time.Time, doc string) (events.Event, bool) {
 			ev.Severity = events.Critical
 		}
 		return ev, true
-	case GroupChanged: // group changed
+	case GroupChanged:
 		ev := evtEvent(events.CatAuth, "group changed", events.Medium, data)
 		ev.Time = now
 		return ev, true
-	case 4697: // service installed
+	case ServiceInstalled:
 		ev := evtEvent(events.CatPersistence, "service installed", events.Critical, data)
 		ev.Time = now
 		ev.Technique = "T1543.003"
 		return ev, true
-	case 4698: // scheduled task created
+	case TaskCreated:
 		ev := evtEvent(events.CatPersistence, "scheduled task created", events.High, data)
 		ev.Time = now
 		ev.Technique = "T1053.005"
 		return ev, true
-	case 4702: // scheduled task updated
+	case TaskUpdated:
 		ev := evtEvent(events.CatPersistence, "scheduled task updated", events.Medium, data)
 		ev.Time = now
 		return ev, true
-	case 7045: // service installed (System)
+	case SystemServiceInstalled:
 		ev := evtEvent(events.CatPersistence, "service installed", events.Critical, data)
 		ev.Time = now
 		ev.Technique = "T1543.003"
 		return ev, true
-	case 7040: // service start type changed
+	case ServiceStartTypeChanged:
 		ev := evtEvent(events.CatPersistence, "service start type changed", events.Medium, data)
 		ev.Time = now
 		return ev, true
