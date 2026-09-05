@@ -1,24 +1,6 @@
 # elmer
 
-Blue team host monitor for Red v Blue competitions. One static binary,
-Linux and Windows, command line only, **zero listening sockets** — elmer only
-makes outbound HTTPS calls to your alert channels, so running it never adds
-attack surface.
-
-elmer watches a host for attacker activity and alerts on it:
-
-- **Process execution** — every exec with full command line
-- **Authentication** — SSH logons/failures (with brute-force correlation),
-  sudo, account changes; on Windows: logon events, account/service/task
-  audit events
-- **File integrity** — /etc/passwd, sudoers, authorized_keys, cron, systemd,
-  ld.so.preload, binary directories, /tmp (inotify); Windows: startup
-  folders, hosts file, registry Run keys
-- **Network** — new listeners, outbound connections (with pid attribution),
-  suspicious ports, external destinations
-- **Persistence** — periodic sweep diffing users, SUID binaries, systemd
-  units, cron, kernel modules, SSH keys, Run keys, services, scheduled
-  tasks, local admins against a baseline
+Simple tool for detecting and alerting suspicious activity on Linux and Windows.
 
 Built-in detections cover reverse shells (bash/dev/tcp, nc -e, socat,
 python/perl/ruby/php one-liners, mkfifo), tunnels (chisel, frp, ngrok,
@@ -93,21 +75,3 @@ make generate       # regenerate embedded BPF objects (Linux container;
 
 Static binaries, `CGO_ENABLED=0`. Dependencies: cobra, x/sys, yaml.v3,
 cilium/ebpf (loader only — BPF bytecode is precompiled and embedded).
-
-## Notes for competition use
-
-- Start from `elmer.example.yaml` — a commented, competition-ready config
-  (internal CIDRs, flag rule, suspicious ports, relayed alerting).
-- Competition boxes are usually air-gapped. Route Discord alerts through
-  `tools/discord_relay.py` running on a blue team box that has internet:
-  elmer's webhook channel POSTs to it over the LAN (HMAC-signed), and it
-  forwards to Discord while logging every alert locally.
-- Run `elmer audit --write-baseline` at gold-image/clean time so sweeps
-  alert on deltas, not stock state.
-- Set `internal_cidrs` to the competition ranges — external connections
-  stand out immediately.
-- Red team will try to kill elmer. Consider a cron entry or systemd timer
-  that restarts it, and watch the Discord channel for silence.
-- `state_dir` (default `/var/lib/elmer` or `C:\ProgramData\elmer`) holds
-  baselines; make sure it's writable.
-- On Windows, 4688 command lines require `elmer harden` (auditpol + registry).
