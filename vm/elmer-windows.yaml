@@ -19,7 +19,9 @@ internal_cidrs:
   - 192.168.0.0/16
   - 127.0.0.0/8
 
-dedupe_cooldown: 60s
+# Longer than sweep_interval so a leftover Run key is not re-paged every sweep
+# if the running process still has a stale in-memory baseline.
+dedupe_cooldown: 10m
 heartbeat: 1m
 log_all_process_events: true
 

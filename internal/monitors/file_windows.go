@@ -157,7 +157,7 @@ func (m *FileMonitor) consume(b []byte, dir string, out chan<- events.Event) {
 		} else {
 			off += int(next)
 		}
-		if name == "" {
+		if name == "" || strings.EqualFold(filepath.Base(name), "desktop.ini") {
 			continue
 		}
 		path := filepath.Join(dir, name)

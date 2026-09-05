@@ -239,3 +239,10 @@ after cleaning up attacker leftovers, or use `destroy` for a truly clean box.
   is slow — `boot_timeout` is 15 minutes).
 - **win01 IIS not serving** — the features provisioner reboots once; a
   failed first `vagrant up win01` is usually fixed by `vagrant provision win01`.
+- **IIS 500 on `start /b` or certutil** — old `ping.asp` used `WScript.Shell.Exec`
+  and blocked on the child's stdout. Current `win-www/ping.asp` uses `Run` plus
+  a temp file; upload it (`vagrant upload win-www/ping.asp C:/inetpub/wwwroot/ping.asp win01`)
+  if the guest predates that change.
+- **Persistence sweep re-pages leftovers** — write a new baseline
+  (`elmer audit --write-baseline`) after you absorb attacker changes; the
+  running Windows monitor reloads the file on the next sweep.

@@ -74,14 +74,29 @@ func (m *PersistenceMonitor) Start(ctx context.Context, out chan<- events.Event)
 
 	t := time.NewTicker(m.cfg.SweepTime)
 	defer t.Stop()
+	var diskMod time.Time
+	if fi, err := os.Stat(path); err == nil {
+		diskMod = fi.ModTime()
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-t.C:
-			for _, ev := range DiffPersistenceWin(baseline, CollectWinSnapshot()) {
+			// Pick up `elmer audit --write-baseline` without a restart.
+			if fi, err := os.Stat(path); err == nil && fi.ModTime().After(diskMod) {
+				if next := loadWinSnapshot(path); next != nil {
+					baseline = next
+					diskMod = fi.ModTime()
+				}
+			}
+			cur := CollectWinSnapshot()
+			for _, ev := range DiffPersistenceWin(baseline, cur) {
 				out <- ev
 			}
+			// Alert on transitions, not every sweep, so a leftover Run key
+			// does not HIGH-page every 5 minutes.
+			baseline = cur
 		}
 	}
 }
@@ -100,7 +115,7 @@ func CollectWinSnapshot() *PersistenceSnapshot {
 			continue
 		}
 		for _, e := range ents {
-			if e.IsDir() {
+			if e.IsDir() || strings.EqualFold(e.Name(), "desktop.ini") {
 				continue
 			}
 			info, err := e.Info()
@@ -147,7 +162,7 @@ func readServices() map[string]string {
 		}
 		img, _, err := sk.GetStringValue("ImagePath")
 		if err == nil && img != "" {
-			out[n] = strings.ToLower(img)
+			out[n] = normalizeImagePath(img)
 		}
 		sk.Close()
 	}
@@ -240,6 +255,11 @@ func DiffPersistenceWin(old, cur *PersistenceSnapshot) []events.Event {
 		}
 	}
 	return out
+}
+
+func normalizeImagePath(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	return strings.Trim(s, `"`)
 }
 
 func winContains(list []string, s string) bool {

@@ -11,8 +11,7 @@ command -v sshpass >/dev/null 2>&1 || need expect "macOS ships expect; linux: ap
 say "logging in as svc_backup with the well-known password"
 ssh_try svc_backup backup123 'whoami' ||
   die "SSH as svc_backup failed — OpenSSH up? password auth on?"
-# Forward slashes: expect/Tcl treats \U in C:\Users as a unicode escape.
-ssh_try svc_backup backup123 'type C:/Users/svc_backup/flag.txt'
+ssh_try svc_backup backup123 'type C:\Users\svc_backup\flag.txt'
 
 note "expected on the target:"
 note "  auth    INFO/LOW  logon 4624 (network) from $HOST_IP"

