@@ -41,28 +41,26 @@ const (
 	tcpTableOwnerPidAll = 5
 	udpTableOwnerPid    = 1
 	afInet              = 2
-	afInet6             = 23
 
 	mibTcpStateListen      = 2
 	mibTcpStateEstablished = 5
 )
 
+// MIB_TCPROW_OWNER_PID / MIB_UDPROW_OWNER_PID. IPv6 uses a different
+// layout (16-byte addresses + scope IDs); we only poll AF_INET.
 type tcpRow struct {
-	State         uint32
-	LocalAddr     uint32
-	LocalScopeID  uint32
-	LocalPort     uint32
-	RemoteAddr    uint32
-	RemoteScopeID uint32
-	RemotePort    uint32
-	OwningPid     uint32
+	State      uint32
+	LocalAddr  uint32
+	LocalPort  uint32
+	RemoteAddr uint32
+	RemotePort uint32
+	OwningPid  uint32
 }
 
 type udpRow struct {
-	LocalAddr    uint32
-	LocalScopeID uint32
-	LocalPort    uint32
-	OwningPid    uint32
+	LocalAddr uint32
+	LocalPort uint32
+	OwningPid uint32
 }
 
 type connKey struct {
@@ -70,7 +68,7 @@ type connKey struct {
 }
 
 func (m *NetMonitor) Start(ctx context.Context, out chan<- events.Event) error {
-	m.caps = append(m.caps, "TCP/UDP table polling with pid attribution")
+	m.caps = append(m.caps, "TCP/UDP table polling with pid attribution (IPv4)")
 	prev := snapshotWin()
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
@@ -156,10 +154,12 @@ func lastColon(s string) int {
 	return -1
 }
 
-// snapshotWin returns the current connection set keyed for diffing.
+// snapshotWin returns the current IPv4 connection set keyed for diffing.
+// AF_INET6 uses a different row layout (16-byte addresses); skip it rather
+// than overlay the IPv4 struct and emit garbage endpoints.
 func snapshotWin() map[connKey]uint32 {
 	out := map[connKey]uint32{}
-	for _, af := range []uint32{afInet, afInet6} {
+	for _, af := range []uint32{afInet} {
 		if rows, err := tcpTable(af); err == nil {
 			for _, r := range rows {
 				var state string
@@ -173,10 +173,10 @@ func snapshotWin() map[connKey]uint32 {
 				}
 				remote := ""
 				if state == "ESTABLISHED" {
-					remote = fmt.Sprintf("%s:%d", ipStr(r.RemoteAddr, af), portHtons(r.RemotePort))
+					remote = fmt.Sprintf("%s:%d", ipStr(r.RemoteAddr), portHtons(r.RemotePort))
 				}
 				k := connKey{
-					local:  fmt.Sprintf("%s:%d", ipStr(r.LocalAddr, af), portHtons(r.LocalPort)),
+					local:  fmt.Sprintf("%s:%d", ipStr(r.LocalAddr), portHtons(r.LocalPort)),
 					remote: remote,
 					state:  state,
 				}
@@ -186,7 +186,7 @@ func snapshotWin() map[connKey]uint32 {
 		if rows, err := udpTable(af); err == nil {
 			for _, r := range rows {
 				k := connKey{
-					local: fmt.Sprintf("%s:%d", ipStr(r.LocalAddr, af), portHtons(r.LocalPort)),
+					local: fmt.Sprintf("%s:%d", ipStr(r.LocalAddr), portHtons(r.LocalPort)),
 					state: "UDP",
 				}
 				out[k] = r.OwningPid
@@ -196,17 +196,11 @@ func snapshotWin() map[connKey]uint32 {
 	return out
 }
 
-// ipStr converts the little-endian DWORD address form to a string.
-func ipStr(v uint32, af uint32) string {
+// ipStr converts a DWORD IPv4 address (network-order bytes in memory) to text.
+func ipStr(v uint32) string {
 	b := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, v)
-	ip := net.IP(b)
-	if af == afInet6 {
-		// Scope IDs and v4-mapped handling: render the v4 form; full v6
-		// rendering from DWORD pairs is handled by the caller's afInet path.
-		return ip.String()
-	}
-	return ip.String()
+	return net.IP(b).String()
 }
 
 func portHtons(p uint32) uint32 {

@@ -42,8 +42,7 @@ func (m *ProcessMonitor) Start(ctx context.Context, out chan<- events.Event) err
 	defer sub.close()
 	m.caps = append(m.caps, "event log 4688 process creation (with command line if audited)")
 
-	stop := ctx.Done()
-	return runEvtLoop(stop, sub, func(doc string) {
+	err = runEvtLoop(ctx.Done(), sub, func(doc string) {
 		id, data, err := parseEvtXml(doc)
 		if err != nil || id != 4688 {
 			return
@@ -72,6 +71,13 @@ func (m *ProcessMonitor) Start(ctx context.Context, out chan<- events.Event) err
 			out <- ev
 		}
 	})
+	if err != nil && ctx.Err() == nil {
+		m.caps = append(m.caps, "4688 loop failed; Toolhelp32 polling")
+		out <- DegradedNote("process: Security 4688 loop failed (" + err.Error() +
+			") — falling back to snapshot polling")
+		return m.runToolhelp(ctx, out)
+	}
+	return err
 }
 
 func trim0x(s string) string {

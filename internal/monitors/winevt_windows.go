@@ -5,8 +5,11 @@ package monitors
 import (
 	"encoding/xml"
 	"fmt"
+	"runtime"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 
 	"elmer/internal/events"
 )
@@ -22,15 +25,25 @@ var (
 
 const (
 	evtSubscribeToFutureEvents = 1
-	evtSubscribePull           = 0x100
 	evtRenderEventXml          = 1
-
-	evtNextArraySize = 64
+	evtNextArraySize           = 64
 )
+
+func evtNoEvents(err syscall.Errno, returned uint32) bool {
+	switch err {
+	case windows.ERROR_NO_MORE_ITEMS, windows.WAIT_TIMEOUT, windows.ERROR_TIMEOUT:
+		return true
+	case windows.ERROR_INVALID_OPERATION:
+		// Win11 empty pull: not ERROR_NO_MORE_ITEMS (winlogbeat same munge).
+		return returned == 0
+	}
+	return false
+}
 
 // evtSubscription is a pull-mode subscription to one channel/query.
 type evtSubscription struct {
 	handle syscall.Handle
+	signal windows.Handle
 }
 
 func evtSubscribe(channel, query string) (*evtSubscription, error) {
@@ -42,18 +55,29 @@ func evtSubscribe(channel, query string) (*evtSubscription, error) {
 	if err != nil {
 		return nil, err
 	}
-	h, _, err := procEvtSubscribe.Call(
-		0, // session (local)
-		0, // signal (pull mode)
+	// Manual-reset event kept for the life of the subscription. Closing it
+	// after EvtSubscribe (a winlogbeat shortcut) makes Win11 EvtNext return
+	// ERROR_INVALID_OPERATION on every empty poll, which we used to treat as
+	// fatal and tear the monitor down.
+	sig, err := windows.CreateEvent(nil, 1, 0, nil)
+	if err != nil || sig == 0 {
+		return nil, fmt.Errorf("EvtSubscribe(%s): CreateEvent: %w", channel, err)
+	}
+	// SyscallN (not LazyProc.Call): ARM64 Call() with 8 args mis-marshals
+	// the last parameters and Win11 returns ERROR_INVALID_PARAMETER.
+	h, _, callErr := syscall.SyscallN(procEvtSubscribe.Addr(),
+		0,
+		uintptr(sig),
 		uintptr(unsafe.Pointer(pch)),
 		uintptr(unsafe.Pointer(pq)),
 		0, 0, 0,
-		evtSubscribeToFutureEvents|evtSubscribePull,
+		uintptr(evtSubscribeToFutureEvents),
 	)
 	if h == 0 {
-		return nil, fmt.Errorf("EvtSubscribe(%s): %w", channel, err)
+		windows.CloseHandle(sig)
+		return nil, fmt.Errorf("EvtSubscribe(%s): %w", channel, syscall.Errno(callErr))
 	}
-	return &evtSubscription{handle: syscall.Handle(h)}, nil
+	return &evtSubscription{handle: syscall.Handle(h), signal: sig}, nil
 }
 
 func (s *evtSubscription) close() {
@@ -61,25 +85,51 @@ func (s *evtSubscription) close() {
 		procEvtClose.Call(uintptr(s.handle))
 		s.handle = 0
 	}
+	if s.signal != 0 {
+		windows.CloseHandle(s.signal)
+		s.signal = 0
+	}
 }
 
-// next blocks up to timeoutMs and returns rendered event XML strings.
+// next waits up to timeoutMs for the subscription signal, then drains
+// available events. An empty result is not an error.
 func (s *evtSubscription) next(timeoutMs uint32) ([]string, error) {
+	if s.signal != 0 {
+		_, _ = windows.WaitForSingleObject(s.signal, timeoutMs)
+	}
+	var out []string
+	for {
+		batch, err := s.pull()
+		if err != nil {
+			return out, err
+		}
+		if len(batch) == 0 {
+			if s.signal != 0 {
+				_ = windows.ResetEvent(s.signal)
+			}
+			return out, nil
+		}
+		out = append(out, batch...)
+	}
+}
+
+func (s *evtSubscription) pull() ([]string, error) {
 	var evts [evtNextArraySize]syscall.Handle
 	var returned uint32
-	ok, _, err := procEvtNext.Call(
+	ok, _, errno := syscall.SyscallN(procEvtNext.Addr(),
 		uintptr(s.handle),
-		evtNextArraySize,
+		uintptr(evtNextArraySize),
 		uintptr(unsafe.Pointer(&evts[0])),
-		uintptr(timeoutMs),
+		0, // timeout: the signal event already gated us
+		0,
 		uintptr(unsafe.Pointer(&returned)),
 	)
 	if ok == 0 {
-		// ERROR_NO_MORE_ITEMS (259) or ERROR_TIMEOUT (253): no events now.
-		if code := err.(syscall.Errno); code == 259 || code == 253 {
+		code := syscall.Errno(errno)
+		if evtNoEvents(code, returned) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, code
 	}
 	defer func() {
 		for i := uint32(0); i < returned; i++ {
@@ -99,14 +149,14 @@ func (s *evtSubscription) next(timeoutMs uint32) ([]string, error) {
 }
 
 func renderEventXml(h syscall.Handle) (string, error) {
-	var bufSize uint32
+	var bufSize, propCount uint32
 	procEvtRender.Call(0, uintptr(h), evtRenderEventXml, 0, 0,
-		uintptr(unsafe.Pointer(&bufSize)), 0)
+		uintptr(unsafe.Pointer(&bufSize)), uintptr(unsafe.Pointer(&propCount)))
 	if bufSize == 0 {
 		return "", fmt.Errorf("EvtRender: no size")
 	}
 	buf := make([]uint16, bufSize/2)
-	var used, propCount uint32
+	var used uint32
 	ok, _, err := procEvtRender.Call(0, uintptr(h), evtRenderEventXml,
 		uintptr(bufSize), uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(unsafe.Pointer(&used)), uintptr(unsafe.Pointer(&propCount)))
@@ -177,6 +227,8 @@ func lowerASCII(s string) string {
 // runEvtLoop drives a subscription until ctx is done, calling fn for each
 // event XML document.
 func runEvtLoop(stop <-chan struct{}, sub *evtSubscription, fn func(xml string)) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	for {
 		select {
 		case <-stop:

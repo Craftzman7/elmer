@@ -214,7 +214,7 @@ cat <<'EOF'
   redis          : 192.168.56.10:6379 — no auth, webroot writable by redis
   flags          : /home/svc_backup/flag.txt, /var/www/flag.txt, /root/flag.txt
 
-  watch elmer    : vagrant ssh -c 'sudo journalctl -u elmer -f'
+  watch elmer    : vagrant ssh -c 'sudo journalctl -u elmer -f'   # web01
   attack it      : vm/attacks/run-all.sh   (from the repo root, on the host)
 
 EOF

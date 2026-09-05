@@ -1,11 +1,16 @@
-# elmer test target — a deliberately vulnerable Ubuntu box running elmer as
-# a root systemd service, exercised by the attack chain in attacks/.
+# elmer test targets — deliberately vulnerable Ubuntu ("web01") and
+# Windows ("win01") boxes running elmer, exercised by attacks/ and
+# attacks-win/.
 #
-# Apple Silicon (VirtualBox 7.1+ ARM): the only maintained arm64
-# VirtualBox boxes are Ubuntu 24.04 (cloudicio/ubuntu-server). Intel hosts
-# and competition boxes use bento/ubuntu-22.04 (jammy); provision.sh
-# handles both. The binary and config are pushed over SSH by the file
-# provisioner, so the box needs no guest additions or synced folders.
+# Apple Silicon (VirtualBox 7.1+ ARM):
+#   Linux   cloudicio/ubuntu-server 24.04.1
+#   Windows gusztavvargadr/windows-11-25h2-professional (ARM64)
+# Intel hosts (and competition boxes):
+#   Linux   bento/ubuntu-22.04
+#   Windows gusztavvargadr/windows-11 (AMD64 Enterprise)
+# provision.sh / provision.ps1 handle the per-OS details. Binaries and
+# configs are pushed by the file provisioner, so the boxes need no
+# guest additions or synced folders.
 require "etc"
 
 arm_host = Etc.uname[:version].include?("ARM64") ||
@@ -13,35 +18,90 @@ arm_host = Etc.uname[:version].include?("ARM64") ||
            RUBY_PLATFORM.include?("arm64")
 
 dist = File.expand_path("../dist", __dir__)
-bin = File.join(dist, arm_host ? "elmer-linux-arm64" : "elmer-linux-amd64")
+linux_bin = File.join(dist, arm_host ? "elmer-linux-arm64" : "elmer-linux-amd64")
+win_bin = File.join(dist, arm_host ? "elmer-windows-arm64.exe" : "elmer-windows-amd64.exe")
 
 Vagrant.configure("2") do |config|
-  if arm_host
-    config.vm.box = "cloudicio/ubuntu-server"
-    config.vm.box_version = "24.04.1"
-  else
-    config.vm.box = "bento/ubuntu-22.04"
-  end
-  config.vm.hostname = "web01"
-
   # Nothing is shared via vboxsf; everything the guest needs arrives over
-  # SSH. This keeps the box provider-portable (virtualbox, qemu, libvirt).
+  # SSH/WinRM. This keeps the boxes provider-portable.
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
-  # Static host-only address; the host side of the adapter is 192.168.56.1,
-  # which is where the attack scripts expect the attacker to live.
-  config.vm.network "private_network", ip: "192.168.56.10"
+  # ---- Ubuntu -----------------------------------------------------------
+  # Primary so existing `vagrant up` / `vagrant ssh` keep targeting Linux.
+  config.vm.define "web01", primary: true do |linux|
+    if arm_host
+      linux.vm.box = "cloudicio/ubuntu-server"
+      linux.vm.box_version = "24.04.1"
+    else
+      linux.vm.box = "bento/ubuntu-22.04"
+    end
+    linux.vm.hostname = "web01"
 
-  config.vm.provider "virtualbox" do |vb|
-    vb.name = "elmer-target"
-    vb.memory = 2048
-    vb.cpus = 2
-  end
+    # Static host-only address; the host side of the adapter is
+    # 192.168.56.1, which is where the attack scripts expect the attacker
+    # to live.
+    linux.vm.network "private_network", ip: "192.168.56.10"
 
-  if File.exist?(bin)
-    config.vm.provision "file", source: bin, destination: "/tmp/elmer"
-  end
-  config.vm.provision "file", source: File.expand_path("elmer.yaml", __dir__),
+    linux.vm.provider "virtualbox" do |vb|
+      vb.name = "elmer-target"
+      vb.memory = 2048
+      vb.cpus = 2
+    end
+
+    if File.exist?(linux_bin)
+      linux.vm.provision "file", source: linux_bin, destination: "/tmp/elmer"
+    end
+    linux.vm.provision "file", source: File.expand_path("elmer.yaml", __dir__),
                                destination: "/tmp/elmer.yaml"
-  config.vm.provision "shell", path: "provision.sh"
+    linux.vm.provision "shell", path: "provision.sh"
+  end
+
+  # ---- Windows ----------------------------------------------------------
+  # Opt-in: the box is a multi-GB download and wants 4 GB RAM. Bring it
+  # up with `vagrant up win01` after `make build-windows`.
+  config.vm.define "win01", autostart: false do |win|
+    win.vm.guest = :windows
+    win.vm.communicator = "winrm"
+    # Negotiate/digest blows up on some host OpenSSL builds (macOS);
+    # the gusztavvargadr boxes already allow unencrypted Basic.
+    win.winrm.transport = :plaintext
+    win.winrm.basic_auth_only = true
+    win.winrm.retry_limit = 60
+    win.winrm.retry_delay = 10
+    win.vm.boot_timeout = 900
+    win.vm.graceful_halt_timeout = 120
+
+    if arm_host
+      # ARM64-only canonical box (Windows 11 25H2 Professional).
+      win.vm.box = "gusztavvargadr/windows-11-25h2-professional"
+      win.vm.box_architecture = "arm64"
+    else
+      win.vm.box = "gusztavvargadr/windows-11"
+      win.vm.box_architecture = "amd64"
+    end
+    win.vm.hostname = "win01"
+    win.vm.network "private_network", ip: "192.168.56.20"
+
+    win.vm.provider "virtualbox" do |vb|
+      vb.name = "elmer-target-win"
+      vb.memory = 4096
+      vb.cpus = 2
+    end
+
+    if File.exist?(win_bin)
+      win.vm.provision "file", source: win_bin,
+                               destination: "C:/Windows/Temp/elmer.exe"
+    end
+    win.vm.provision "file", source: File.expand_path("elmer-windows.yaml", __dir__),
+                             destination: "C:/Windows/Temp/elmer.yaml"
+    win.vm.provision "file", source: File.expand_path("win-www/index.asp", __dir__),
+                             destination: "C:/Windows/Temp/index.asp"
+    win.vm.provision "file", source: File.expand_path("win-www/ping.asp", __dir__),
+                             destination: "C:/Windows/Temp/ping.asp"
+    # IIS (and friends) often need a reboot before W3SVC will bind.
+    # Features is a separate script so PowerShell never parses the ASP.
+    win.vm.provision "win-features", type: "shell", path: "provision-features.ps1",
+                     reboot: true
+    win.vm.provision "win-configure", type: "shell", path: "provision.ps1"
+  end
 end

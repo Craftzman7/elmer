@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 
+	"golang.org/x/sys/windows"
+
 	"elmer/internal/config"
 	"elmer/internal/events"
 	"elmer/internal/monitors"
@@ -46,9 +48,9 @@ func Harden(cfg *config.Config) error {
 		name string
 		args []string
 	}{
-		{"enable process creation auditing", []string{"/set", `/subcategory:"Process Creation"`, `/success:enable`}},
+		{"enable process creation auditing", []string{"/set", "/subcategory:{0CCE922B-69AE-11D9-BED3-505054503030}", "/success:enable"}},
 		{"include command line in 4688", []string{"add", `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit`, "/v", "ProcessCreationIncludeCmdLine_Enabled", "/t", "REG_DWORD", "/d", "1", "/f"}},
-		{"enable logon failure auditing", []string{"/set", `/subcategory:"Logon"`, `/failure:enable`}},
+		{"enable logon failure auditing", []string{"/set", "/subcategory:{0CCE9215-69AE-11D9-BED3-505054503030}", "/failure:enable"}},
 	}
 	for _, st := range steps {
 		var cmd *exec.Cmd
@@ -69,8 +71,12 @@ func Harden(cfg *config.Config) error {
 }
 
 func isAdmin() bool {
-	_, err := os.ReadFile(`C:\Windows\System32\config\SECURITY`) // admin-only readable
-	return err == nil
+	sid, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
+	if err != nil {
+		return false
+	}
+	yes, err := windows.GetCurrentProcessToken().IsMember(sid)
+	return err == nil && yes
 }
 
 // Audit prints the current persistence surface and optionally rebaselines.
